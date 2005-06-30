@@ -11,7 +11,7 @@ field keywords_directory => '-init' =>
 field pages_directory => '-init' =>
     '$self->plugin_directory . "/pages"';
 
-our $VERSION = '0.10';
+our $VERSION = '0.11';
 
 sub init {
     super;
@@ -37,9 +37,14 @@ sub register {
 }
 
 sub keyword_add {
-    my $keyword = $self->cgi->keyword;
+    my $keywords = $self->cgi->keyword;
     my $page = $self->hub->pages->new_from_name($self->cgi->page_name);
-    $self->add_keyword($page, $keyword);
+    for my $keyword (split /\s+/, $keywords) {
+        next unless $keyword;
+        die "'$keyword' contains illegal characters"
+          unless $keyword =~ /^[\w\-]+$/;
+        $self->add_keyword($page, $keyword);
+    }
     $self->redirect($page->uri);
 }
 
@@ -72,14 +77,15 @@ sub keyword_list {
 
 sub get_all_keywords {
     my $io = io($self->keywords_directory);
-    return [ sort {lc($a) cmp lc($b)} (
-    grep {
-       scalar(@{$self->get_pages_for_keyword($_)}) 
-    } 
-    map {
-        $_->filename
-    } 
-    $io->all) ];
+    return [ 
+        sort {lc($a) cmp lc($b)}
+        grep {
+           scalar(@{$self->get_pages_for_keyword($_)}) 
+        } 
+        map {
+            $_->filename
+        } $io->all
+    ];
 }
 
 sub get_pages_for_keyword {
@@ -97,7 +103,12 @@ sub keywords_for_page {
     my $page = $self->hub->pages->current->id;
     my $io = io($self->pages_directory . "/$page");
     my $keywords = $io->exists
-      ? [ map { $_->filename } $io->all ]
+      ? [ 
+            map { $_->filename } sort {
+                $b->mtime <=> $a->mtime or
+                lc("$a") cmp lc("$b")
+            } $io->all
+        ]
       : [];
     return $keywords;
 }
@@ -207,7 +218,7 @@ function keyword_validate(myform) {
         alert("No Keyword Specified")
         return false
     }
-    if (! keyword.match(/^[a-z\-]+$/)) {
+    if (! keyword.match(/^[\w\-\ ]+$/)) {
         alert("Invalid Value for Keyword")
         return false
     }
@@ -222,14 +233,17 @@ function keyword_validate(myform) {
 [% IF keywords.size %]
 [% FOREACH keyword = keywords %]
 <div style="font-size: small; display:block; text-decoration: none; padding-bottom: .25em;">
-<input type="checkbox" name="[% keyword %]" onclick="return keyword_delete(this);">
-   &nbsp;<a href="[% script_name %]?action=keyword_display;keyword=[% keyword %]">[% keyword %]</a>
+<input
+ type="checkbox"
+ name="[% keyword %]"
+ onclick="return keyword_delete(this);">&nbsp;<a
+ href="[% script_name %]?action=keyword_display;keyword=[% keyword %]">[% keyword %]</a>
 [% END %]
 </div>
 [% END %]
 <input type="hidden" name="action" value="keyword_add" />
 <input type="hidden" name="page_name" value="[% page_name %]" />
-<input name="keyword" type="text" value="New Tag" onclick="this.value = ''" size="10" />
+<input name="keyword" type="text" value="New Keywords" onclick="this.value = ''" size="12" />
 </form>
 </div>
 __template/tt2/keyword_list_button.html__
