@@ -11,7 +11,7 @@ field keywords_directory => '-init' =>
 field pages_directory => '-init' =>
     '$self->plugin_directory . "/pages"';
 
-our $VERSION = '0.11';
+our $VERSION = '0.12';
 
 sub init {
     super;
@@ -39,11 +39,13 @@ sub register {
 sub keyword_add {
     my $keywords = $self->cgi->keyword;
     my $page = $self->hub->pages->new_from_name($self->cgi->page_name);
+    my $count = 1;
     for my $keyword (split /\s+/, $keywords) {
         next unless $keyword;
         die "'$keyword' contains illegal characters"
           unless $keyword =~ /^[\w\-]+$/;
         $self->add_keyword($page, $keyword);
+        last if ++$count > 5;   # sanity limit
     }
     $self->redirect($page->uri);
 }
@@ -236,10 +238,12 @@ function keyword_validate(myform) {
 <input
  type="checkbox"
  name="[% keyword %]"
- onclick="return keyword_delete(this);">&nbsp;<a
+ onclick="return keyword_delete(this);"
+ checked
+>&nbsp;<a
  href="[% script_name %]?action=keyword_display;keyword=[% keyword %]">[% keyword %]</a>
-[% END %]
 </div>
+[% END %]
 [% END %]
 <input type="hidden" name="action" value="keyword_add" />
 <input type="hidden" name="page_name" value="[% page_name %]" />
