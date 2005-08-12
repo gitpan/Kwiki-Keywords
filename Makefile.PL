@@ -1,14 +1,14 @@
 use inc::Module::Install;
 
 name('Kwiki-Keywords');
-author('Brian Ingerson <ingy@cpan.org>');
+author('Chris Dent <cdent@cpan.org>');
 abstract('Keywords for Kwiki');
 license('perl');
 version_from('lib/Kwiki/Keywords.pm');
 
-requires(qw(
-    perl 5.6.1
-));
+requires(
+    Kwiki => 0.38,
+);
 
 check_nmake();
 

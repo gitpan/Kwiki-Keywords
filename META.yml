@@ -1,11 +1,11 @@
 name: Kwiki-Keywords
-version: 0.12
+version: 0.13
 abstract: Keywords for Kwiki
-author: Brian Ingerson <ingy@cpan.org>
+author: Chris Dent <cdent@cpan.org>
 license: perl
 distribution_type: module
 requires:
-  perl: 5.6.1
+  Kwiki: 0.38
 no_index:
   directory:
     - inc

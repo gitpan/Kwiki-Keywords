@@ -1,4 +1,11 @@
 ---
+version: 0.13
+date: Thu Aug 11 17:33:37 PDT 2005
+changes:
+- keywords_no_automatic config support -rjbs
+- don't do keywords on pages that are not writable -rjbs
+- a bit of docs
+---
 version: 0.12
 date: Thu Jul 28 11:36:26 PDT 2005
 changes:

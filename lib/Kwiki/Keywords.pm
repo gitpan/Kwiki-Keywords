@@ -1,17 +1,18 @@
 package Kwiki::Keywords;
-use Kwiki::Plugin -Base;
-use mixin 'Kwiki::Installer';
+use Kwiki::Plugin '-Base';
+use Kwiki::Installer '-base';
 
 const class_id       => 'keywords';
 const class_title    => 'Keywords';
 const cgi_class      => 'Kwiki::CGI::Keywords';
+const config_file    => 'keywords.yaml';
 
 field keywords_directory => '-init' =>
     '$self->plugin_directory . "/keywords"';
 field pages_directory => '-init' =>
     '$self->plugin_directory . "/pages"';
 
-our $VERSION = '0.12';
+our $VERSION = '0.13';
 
 sub init {
     super;
@@ -119,6 +120,7 @@ sub add_automatic_keywords {
     my $hook = pop;
     my $pages = $self; # we're running in the class with class id page
     $self = $self->hub->keywords; # move ourselves into this class
+    return if $self->hub->config->keywords_no_automatic;
     $self->add_author_keyword;
 }
 
@@ -131,6 +133,7 @@ sub add_author_keyword {
 sub add_keyword {
     my $page = shift;
     my $keyword = shift;
+    return unless $page->is_writable;
     my $id = $page->id;
     io($self->keywords_directory . "/$keyword/$id")->assert->touch;
     io($self->pages_directory . "/$id/$keyword")->assert->touch;
@@ -139,6 +142,7 @@ sub add_keyword {
 sub del_keyword {
     my $page = shift;
     my $keyword = shift;
+    return unless $page->is_writable;
     my $id = $page->id;
     io($self->keywords_directory . "/$keyword/$id")->unlink;
     io($self->pages_directory . "/$id/$keyword")->unlink;
@@ -160,11 +164,30 @@ Kwiki::Keywords - Keywords for Kwiki
 
 =head1 SYNOPSIS
 
+  kwiki -add Kwiki::Keywords
+
 =head1 DESCRIPTION
+
+Kwiki::Keywords provides keywords (or tags) for each Kwiki Page. You
+can then browse by keyword. If a page is edited by someone with
+a Kwiki UserName, the name will be added as a keyword. This feature
+can be turned off by setting
+
+  keywords_no_automatic: 1
+
+in config.yaml.
 
 =head1 AUTHOR
 
-YAPC::NA
+YAPC::NA, Chris Dent, Brian Ingerson
+
+=head1 CREDITS
+
+This module was created on the fly at YAPC::NA 2005 in Toronto by
+everyone at the Kwiki presentation.
+
+Ricardo SIGNES provided the keywords_no_auto patch and made it
+so keywords are only written to writable pages.
 
 =head1 COPYRIGHT
 
@@ -231,8 +254,9 @@ function keyword_validate(myform) {
 <div style="font-family: Helvetica, Arial, sans-serif; overflow: hidden;"
      id="keywords">
 <h3 style="font-size: small; text-align: center; letter-spacing: .25em; padding-bottom: .25em;">KEYWORDS</h3>
-<form name="keywords" method="POST" action="" onsubmit="return keyword_validate(this)">
-[% IF keywords.size %]
+[% IF hub.pages.current.is_writable %]
+<form name="keywords" method="POST" action=""
+      onsubmit="return keyword_validate(this)">
 [% FOREACH keyword = keywords %]
 <div style="font-size: small; display:block; text-decoration: none; padding-bottom: .25em;">
 <input
@@ -244,11 +268,18 @@ function keyword_validate(myform) {
  href="[% script_name %]?action=keyword_display;keyword=[% keyword %]">[% keyword %]</a>
 </div>
 [% END %]
-[% END %]
 <input type="hidden" name="action" value="keyword_add" />
 <input type="hidden" name="page_name" value="[% page_name %]" />
 <input name="keyword" type="text" value="New Keywords" onclick="this.value = ''" size="12" />
 </form>
+[% ELSE %]
+[% FOREACH keyword = keywords %]
+<div style="font-size: small; display:block; text-decoration: none; padding-bottom: .25em;">
+<a
+ href="[% script_name %]?action=keyword_display;keyword=[% keyword %]">[% keyword %]</a>
+ </div>
+[% END %]
+[% END %]
 </div>
 __template/tt2/keyword_list_button.html__
 <a href="[% script_name %]?action=keyword_list">
@@ -256,3 +287,6 @@ __template/tt2/keyword_list_button.html__
 </a>
 __template/tt2/keywords_button_icon.html__
 Keywords
+__config/keywords.yaml__
+keywords_no_automatic: 0
+
