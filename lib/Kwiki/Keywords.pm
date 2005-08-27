@@ -12,7 +12,7 @@ field keywords_directory => '-init' =>
 field pages_directory => '-init' =>
     '$self->plugin_directory . "/pages"';
 
-our $VERSION = '0.13';
+our $VERSION = '0.14';
 
 sub init {
     super;
@@ -32,16 +32,25 @@ sub register {
                    template => 'keywords_widget.html',
                    show_for => 'display',
                );
+    $registry->add(widget => 'keywords_related',
+                   template => 'keywords_related_widget.html',
+                   show_for => 'keyword_display',
+               );
     $registry->add(toolbar => 'keyword_list',
                    template => 'keyword_list_button.html'
                );
 }
 
+sub keywords_from_cgi {
+    my @keywords = split /\s+/, $self->cgi->keyword;
+    return \@keywords;
+}
+
 sub keyword_add {
-    my $keywords = $self->cgi->keyword;
+    my $keywords = $self->keywords_from_cgi;
     my $page = $self->hub->pages->new_from_name($self->cgi->page_name);
     my $count = 1;
-    for my $keyword (split /\s+/, $keywords) {
+    for my $keyword (@$keywords) {
         next unless $keyword;
         die "'$keyword' contains illegal characters"
           unless $keyword =~ /^[\w\-]+$/;
@@ -59,10 +68,10 @@ sub keyword_del {
 }
 
 sub keyword_display {
-    my $keyword = $self->cgi->keyword;
-    my $pages = $self->get_pages_for_keyword($keyword);
+    my $keywords = $self->keywords_from_cgi;
+    my $pages    = $self->get_pages_for_keywords(@$keywords);
     $self->render_screen(
-        screen_title => "Pages with keyword $keyword",
+        screen_title => "Pages with keywords {@$keywords}",
         pages => $pages,
     )
 }
@@ -91,6 +100,20 @@ sub get_all_keywords {
     ];
 }
 
+sub get_pages_for_keywords {
+    return $self->get_pages_for_keyword(@_) if @_ == 1;
+
+    my %page;
+    foreach my $keyword (@_) {
+        foreach (@{ $self->get_pages_for_keyword($keyword) }) {
+            my $title = $_->title;
+            if ($page{$title}) { $page{$title}[1]++; next;  }
+            else               { $page{$title} = [ $_, 1 ]; }
+        }
+    }
+    return [ map { $_->[0] } grep { $_->[1] == @_ } values %page ];
+}
+
 sub get_pages_for_keyword {
     my $keyword = shift;
     my $io = io($self->keywords_directory . "/$keyword");
@@ -103,7 +126,7 @@ sub get_pages_for_keyword {
 }
 
 sub keywords_for_page {
-    my $page = $self->hub->pages->current->id;
+    my $page = shift;
     my $io = io($self->pages_directory . "/$page");
     my $keywords = $io->exists
       ? [ 
@@ -114,6 +137,26 @@ sub keywords_for_page {
         ]
       : [];
     return $keywords;
+}
+
+sub keywords_for_current_page {
+    my $page = $self->hub->pages->current->id;
+    return $self->keywords_for_page($page);
+}
+
+sub get_related_keywords {
+    my ($keywords) = @_;
+    my $pages = $self->get_pages_for_keywords(@$keywords);
+
+    my %relations;
+    for (@$pages) {
+        my $page_keywords = $self->keywords_for_page($_->id);
+        for my $related (@$page_keywords) {
+            next if grep { $related eq $_ } @$keywords;
+            $relations{$related}++
+        }
+    }
+    return [ keys %relations ];   
 }
 
 sub add_automatic_keywords {
@@ -186,8 +229,9 @@ YAPC::NA, Chris Dent, Brian Ingerson
 This module was created on the fly at YAPC::NA 2005 in Toronto by
 everyone at the Kwiki presentation.
 
-Ricardo SIGNES provided the keywords_no_auto patch and made it
-so keywords are only written to writable pages.
+Ricardo SIGNES provided the keywords_no_auto patch, made it
+so keywords are only written to writable pages, and added support
+for related tags and display of tag intersections.
 
 =head1 COPYRIGHT
 
@@ -250,7 +294,7 @@ function keyword_validate(myform) {
     return true
 }
 </script>
-[% keywords = hub.keywords.keywords_for_page %]
+[% keywords = hub.keywords.keywords_for_current_page %]
 <div style="font-family: Helvetica, Arial, sans-serif; overflow: hidden;"
      id="keywords">
 <h3 style="font-size: small; text-align: center; letter-spacing: .25em; padding-bottom: .25em;">KEYWORDS</h3>
@@ -275,10 +319,23 @@ function keyword_validate(myform) {
 [% ELSE %]
 [% FOREACH keyword = keywords %]
 <div style="font-size: small; display:block; text-decoration: none; padding-bottom: .25em;">
-<a
- href="[% script_name %]?action=keyword_display;keyword=[% keyword %]">[% keyword %]</a>
+<a href="[% script_name %]?action=keyword_display;keyword=[% keyword %]">[% keyword %]</a>
  </div>
 [% END %]
+[% END %]
+</div>
+__template/tt2/keywords_related_widget.html__
+<div style="font-family: Helvetica, Arial, sans-serif; overflow: hidden;"
+     id="keywords_related">
+<h3 style="font-size: small; text-align: center; letter-spacing: .25em; padding-bottom: .25em;">RELATED</h3>
+[% keywords = hub.keywords.keywords_from_cgi %]
+[% related_keywords = hub.keywords.get_related_keywords(keywords) %]
+[% FOREACH keyword = related_keywords.sort %]
+<div style="font-size: small; display:block; text-decoration: none; padding-bottom: .25em;">
+<a href="[% script_name %]?action=keyword_display;keyword=[% keyword %]">[% keyword %]</a>
+<a href="[% script_name %]?action=keyword_display;keyword=[%
+keywords.merge([keyword]).join(" ") %]">(add)</a>
+</div>
 [% END %]
 </div>
 __template/tt2/keyword_list_button.html__
